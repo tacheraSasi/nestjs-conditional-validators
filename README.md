@@ -1,131 +1,111 @@
-# OTPX
+# nestjs-conditional-validators
 
-A lightweight, flexible OTP (One-Time Password) generator for Node.js and TypeScript.
+Conditional class-validator decorators for NestJS DTOs.
 
-Supports multiple charsets (numeric, alphabetic, alphanumeric, hex, or custom), case options, and exclusion of ambiguous characters like `O0Il`.
-
----
-
-## Features
-
-- Generate OTPs with customizable length
-- Built-in charsets: `numeric`, `alphabetic`, `alphanumeric`, `hex`
-- Provide your own custom charset
-- Exclude visually similar characters (`O`, `0`, `I`, `l`)
-- Case handling: upper, lower, or mixed
-- Secure random generation using Node.js `crypto`
+Adds field-level validation rules that depend on the value of sibling properties — required/optional/empty fields, plus field matching — using the standard `class-validator` `registerDecorator` API. Works with any `class-validator`-based project, not just NestJS.
 
 ---
 
 ## Installation
 
 ```bash
-npm install otpx
-# or
-
+npm install nestjs-conditional-validators
 ```
+
+`class-validator` (>= 0.14.0) is a peer dependency — the consuming app already has it installed.
 
 ---
 
-## Usage
+## Decorators
 
-### Basic Example
+### IsOptionalWhen
+
+Marks a field optional when a related property has one of the given values; otherwise the field is required.
 
 ```ts
-import OTPX from "otpx";
+import { IsEmail } from 'class-validator';
+import { IsOptionalWhen } from 'nestjs-conditional-validators';
 
-// Generate a 6-digit numeric OTP
-const otp = OTPX.numeric();
-console.log(otp); // e.g. "583920"
+class CreateUserDto {
+  provider: 'local' | 'sso';
+
+  // Email is optional for SSO sign-ins, required for local accounts
+  @IsOptionalWhen('provider', ['sso'], { message: 'Email is required for local accounts' })
+  @IsEmail()
+  email?: string;
+}
+```
+
+### IsRequiredWhen
+
+Marks a field required when a related property has one of the given values; otherwise the field is optional.
+
+```ts
+import { IsString } from 'class-validator';
+import { IsRequiredWhen } from 'nestjs-conditional-validators';
+
+class LoginDto {
+  provider: 'local' | 'sso';
+
+  // Password required for local login, optional for SSO
+  @IsRequiredWhen('provider', ['local'], { message: 'Password is required for local login' })
+  @IsString()
+  password?: string;
+}
+```
+
+### IsEmptyWhen
+
+Ensures a field is empty (undefined, null, or `''`) when a related property has one of the given values.
+
+```ts
+import { IsEmptyWhen } from 'nestjs-conditional-validators';
+
+class ApprovalDto {
+  status: 'auto' | 'manual';
+
+  // Prevent contradictory input: no manual reason for auto statuses
+  @IsEmptyWhen('status', ['auto'], { message: 'manualReason must not be provided for auto status' })
+  manualReason?: string;
+}
+```
+
+### MatchesField
+
+Asserts that a field's value strictly equals (===) another field's value.
+
+```ts
+import { IsString } from 'class-validator';
+import { MatchesField } from 'nestjs-conditional-validators';
+
+class RegisterDto {
+  @IsString()
+  password: string;
+
+  @MatchesField('password', { message: 'Passwords do not match' })
+  confirmPassword: string;
+}
 ```
 
 ---
 
-### Using Different Charsets
+## Notes
 
-`````ts
-import OTPX from "otpx";
+- Property references are simple sibling names; deep paths (e.g. `'profile.type'`) are not resolved.
+- Values are matched with strict equality (`===`); `0` and `false` are considered valid non-empty values.
+- Combine with other decorators (e.g. `@IsEmail()`, `@IsString()`) to enforce format when present.
 
-// Alphabetic OTP (mixed case)
-console.log(OTPX.alphabetic(8)); // e.g. "aZkPqTrB"
-
-// Alphanumeric OTP with options
-console.log(OTPX.alphanumeric(10, { excludeSimilar: true }));
-// e.g. "9kPz3Hd2Gq"
-
-// Hexadecimal OTP
-````markdown
-# npm-package-starter-template
-
-A minimal, reusable TypeScript npm package starter template. This repository demonstrates a small library layout with build, test, and type-checking setup so you can quickly scaffold a new package.
-
-## What's included
-- TypeScript source in `src/`
-- Build with `tsup` (CJS + ESM + types)
-- Tests with `jest` + `ts-jest`
-- `tsconfig.json` configured for library builds
-- `LICENSE` (MIT) and example `README.md`
-
-## Quickstart
-
-1. Clone this repo and replace package metadata in `package.json` (name, author, repository, homepage, description).
-2. Update the package source in `src/` and tests in `test/`.
-3. Install dependencies and develop.
-
-```bash
-npm install
-npm run build      # produce dist/ bundles
-npm run test       # run tests
-npm run typecheck  # run TypeScript type check
-`````
-
-When publishing, update `version` and run `npm publish` (or use CI to publish).
+---
 
 ## Development
 
-- Run tests in watch mode:
-
 ```bash
-npm run test:watch
+npm install
+npm run build      # tsup → dist/ (CJS + ESM + types)
+npm run test       # run tests
+npm run typecheck  # run TypeScript type check
 ```
-
-- Clean output and rebuild:
-
-```bash
-npm run clean
-npm run build
-```
-
-## Usage Example
-
-Replace `your-package-name` with the name you set in `package.json`.
-
-```ts
-import MyPackage from "your-package-name";
-
-// use exports from src/index.ts
-console.log(typeof MyPackage);
-```
-
-## Publishing
-
-1. Ensure `package.json` fields are correct (`name`, `version`, `repository`, `license`, `author`).
-2. Build (`npm run build`) and verify `dist/` contains expected files.
-3. Publish to npm:
-
-```bash
-npm publish --access public
-```
-
-## Customize
-
-- Add CI (GitHub Actions) to run `npm test` and `npm run build` on PRs.
-- Add linting (ESLint) and formatting (Prettier) if desired.
 
 ## License
 
 MIT
-
-```
-export class OtpService {
-```
